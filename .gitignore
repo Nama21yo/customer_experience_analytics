@@ -1,0 +1,14 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.env
+venv/
+*.csv
+play_store_scraper.py
+
+# IDEs
+.idea/
+.vscode/
+.venv

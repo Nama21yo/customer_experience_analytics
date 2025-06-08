@@ -1,0 +1,6 @@
+google-play-scraper
+pandas
+torch
+transformers
+scikit-learn
+nltk
