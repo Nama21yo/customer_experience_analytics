@@ -12,10 +12,10 @@ import time
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
-    handlers=[logging.StreamHandler()] 
+    handlers=[logging.StreamHandler()] # Log to console
 )
 
-# necessary NLTK data for text processing
+#  necessary NLTK data for text processing
 try:
     nltk.data.find('corpora/stopwords')
 except nltk.downloader.DownloadError:
@@ -120,6 +120,74 @@ def preprocess_data(df: pd.DataFrame) -> pd.DataFrame:
     logging.info(f"Preprocessing complete. Final dataset has {len(df)} rows.")
     return df
 
+# --- Task 2: Sentiment and Thematic Analysis ----------------------------------
+
+def analyze_sentiment(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Performs sentiment analysis on the review text.
+
+    Args:
+        df (pd.DataFrame): The cleaned review DataFrame.
+
+    Returns:
+        pd.DataFrame: DataFrame with added sentiment label and score.
+    """
+    logging.info("Performing sentiment analysis...")
+    
+    # Load a pre-trained sentiment analysis model
+    # This model is great for general sentiment but is binary (POSITIVE/NEGATIVE)
+    sentiment_pipeline = pipeline(
+        "sentiment-analysis", 
+        model="distilbert-base-uncased-finetuned-sst-2-english"
+    )
+
+    # Apply the pipeline to the review text
+    # Note: For very large datasets, process in batches. For 1200 reviews, this is fine.
+    sentiments = sentiment_pipeline(df['review'].tolist())
+    
+    # Add results to the DataFrame
+    df['sentiment_label_model'] = [s['label'] for s in sentiments]
+    df['sentiment_score'] = [s['score'] for s in sentiments]
+
+    # Business Rule: Adjust labels based on rating for a more nuanced classification
+    # 1-2 stars -> Negative, 3 -> Neutral, 4-5 -> Positive
+    def adjust_sentiment(row):
+        if row['rating'] <= 2:
+            return 'NEGATIVE'
+        elif row['rating'] == 3:
+            return 'NEUTRAL'
+        else: # 4 or 5
+            return 'POSITIVE'
+
+    df['sentiment_label'] = df.apply(adjust_sentiment, axis=1)
+    
+    logging.info("Sentiment analysis complete.")
+    return df
+
+def identify_themes(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Identifies themes in reviews using a keyword-based approach.
+
+    Args:
+        df (pd.DataFrame): DataFrame with review text.
+
+    Returns:
+        pd.DataFrame: DataFrame with an added 'theme' column.
+    """
+    logging.info("Identifying review themes...")
+
+    def assign_theme(review_text: str) -> str:
+        """Helper function to assign a theme based on keyword matching."""
+        review_lower = review_text.lower()
+        for theme, keywords in THEME_KEYWORDS.items():
+            if any(keyword in review_lower for keyword in keywords):
+                return theme
+        return 'General Feedback' # Default theme if no keywords match
+
+    df['theme'] = df['review'].apply(assign_theme)
+    logging.info("Thematic analysis complete.")
+    return df
+
 # --- Main Execution Block ----------------------------------------------------
 
 if __name__ == "__main__":
@@ -133,13 +201,15 @@ if __name__ == "__main__":
         # Save the Task 1 deliverable
         task1_output_path = "task_1_clean_reviews.csv"
         clean_reviews_df.to_csv(task1_output_path, index=False, encoding='utf-8')
-        logging.info(f"Task 1 output saved to: {task1_output_path}")
+        logging.info(f"💾 Task 1 output saved to: {task1_output_path}")
         print("\n--- Task 1 Final DataFrame Head ---")
         print(clean_reviews_df.head())
         print(f"\nValue counts per bank:\n{clean_reviews_df['bank'].value_counts()}")
 
-        # --- Execute Task 2 ---
+        # ---  Task 2 ---
         logging.info("\n--- Starting Task 2: Sentiment & Thematic Analysis ---")
+        sentiment_df = analyze_sentiment(clean_reviews_df)
+        final_analyzed_df = identify_themes(sentiment_df)
         
         # Save the Task 2 deliverable
         task2_output_path = "task_2_analyzed_reviews.csv"
@@ -148,6 +218,12 @@ if __name__ == "__main__":
             'bank', 'date', 'rating', 'review', 
             'sentiment_label', 'sentiment_score', 'theme'
         ]
+        final_analyzed_df[final_columns].to_csv(task2_output_path, index=False, encoding='utf-8')
+        logging.info(f"💾 Task 2 output saved to: {task2_output_path}")
+        print("\n--- Task 2 Final DataFrame Head ---")
+        print(final_analyzed_df[final_columns].head())
+        print(f"\nTheme distribution:\n{final_analyzed_df['theme'].value_counts()}")
+        
     else:
         logging.warning("Scraping returned no data. Halting execution.")
 
