@@ -6,3 +6,5 @@ scikit-learn
 nltk
 oracledb
 SQLAlchemy
+matplotlib
+seaborn
